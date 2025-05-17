@@ -22,7 +22,7 @@ let currentWs;
 let lastTranscription;
 let asterikskAudioDataBuffer = Buffer.alloc(0);
 let transcription;
-let activeChannel;
+let currentChannel;
 
 async function sendAudio(data){
   const wavFilePath = path.join(__dirname, 'generated-audio-'+ Date.now()+'.wav');
@@ -46,7 +46,7 @@ async function sendAudio(data){
 
               const data = {
                   event: "media",
-                  streamSid: "MZXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                  streamSid: currentChannel,
                   media: {
                     track: "outbound",  // "outbound" indica que es el audio de salida
                     chunk: 1,
@@ -62,7 +62,7 @@ async function sendAudio(data){
                       console.log('Audio sent successfully', wavFilePath);
                         const playRemoteAction = {
                           event: "playRemoteAudio",
-                          streamSid: "MZXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+                          streamSid: currentChannel,
                           media: {
                             track: "outbound",  // "outbound" indica que es el audio de salida
                             chunk: 1,
@@ -116,13 +116,13 @@ wss.on("connection", function connection(ws) {
     const msg = JSON.parse(message);
     switch (msg.event) {
       case "connected":
-        console.log(`A new call has connected.`);
+        currentChannel = msg.start.streamSid;
+        console.log(`A new call has connected. streamSid: ${msg.start.streamSid} calSid: ${msg.start.callSid} Time: ${msg.start.time} Protocol: ${msg.start.customParameters.protocol}`);
         break;
       case "start":
-        console.log(`Starting Media Stream`);
-        console.log(`Data ${data}`);
+        console.log(`Starting Media Stream  streamSid: ${msg.start.streamSid} calSid: ${msg.start.callSid} Time: ${msg.start.time} Protocol: ${msg.start.customParameters.protocol}`);
         // Create Stream to the Google Speech to Text API
-        recognizeStream = client
+        /*recognizeStream = client
           .streamingRecognize(request)
           .on("data", (data) => {
 
@@ -137,7 +137,7 @@ wss.on("connection", function connection(ws) {
                     handleTranscription(wss,wavFilePath)
                 }*/
 
-                console.log('Transcription:', transcription);
+                /*console.log('Transcription:', transcription);
                 lastTranscription = transcription;
                 
             }
@@ -156,24 +156,24 @@ wss.on("connection", function connection(ws) {
             if (transcription) {
                 console.log('Transcription:', transcription);
             }*/
-          })
+          /*})
           .on('error', (err) => {
             console.error('Error:', err);
             ws.close();
-          });
+          });*/
         break;
       case "media":
         // Write Media Packets to the recognize stream
         const audioBuffer = Buffer.from(msg.media.payload, 'base64');
         asterikskAudioDataBuffer = Buffer.concat([asterikskAudioDataBuffer, audioBuffer]);
-        recognizeStream.write(audioBuffer)
+        //recognizeStream.write(audioBuffer)
        // recognizeStream.write(msg.media.payload);
         //console.log('Received audio data');
-        //console.log('Received audio data', audioBuffer);
+        console.log('Received audio data', audioBuffer);
         //console.log(`Receiving audio`);
         break;
       case "stop":
-        console.log(`Call Has Ended`);
+        console.log(`Call Has Ended  ${msg.streamSid}`);
         recognizeStream.destroy();
         break;
     }
@@ -206,10 +206,11 @@ app.post("/", (req, res) => {
       <Start>
         <Stream url="wss://${req.headers.host}/"/>
       </Start>
-      <Dial>+15550123456</Dial>
+      <Say>I will stream the next 60 seconds of audio through your websocket</Say>
+      <Pause length="60" />
     </Response>
   `);
 });
 
-console.log("Listening on Port 8080");
+console.log("Listening on Port 8081");
 server.listen(8081);
